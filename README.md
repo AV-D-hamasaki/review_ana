@@ -17,5 +17,9 @@ Upload a CSV or Excel file containing `id`, `title`, `rating`, and `content`
 columns. After running labeling, metrics will be displayed and you can download
 the labeled data as Excel.
 
+The app works with both older and newer versions of the `openai` Python
+package. Provide your API key via the `OPENAI_API_KEY` environment variable or
+Streamlit `secrets.toml`.
+
 Excel files are loaded using the `openpyxl` engine. If `openpyxl` is not
 available at runtime, loading an Excel file will raise an informative error.

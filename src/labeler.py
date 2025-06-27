@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Tuple
 
 import pandas as pd
 
@@ -36,12 +36,34 @@ def _dummy_label(content: str, needs: List[str]) -> Dict[str, Any]:
     }
 
 
+async def _call_openai(msg: List[Dict[str, str]], model: str) -> Tuple[str, Any]:
+    """Call OpenAI API supporting both v0 and v1 clients."""
+    if openai is None:
+        raise RuntimeError("openai library is not available")
+
+    if hasattr(openai, "AsyncOpenAI"):
+        # openai>=1.0
+        client = openai.AsyncOpenAI()
+        resp = await client.chat.completions.create(
+            model=model, messages=msg, temperature=0
+        )
+        need = resp.choices[0].message.content
+        usage = resp.usage.model_dump() if hasattr(resp.usage, "model_dump") else resp.usage
+    else:
+        # openai<1.0
+        resp = await openai.ChatCompletion.acreate(
+            model=model, messages=msg, temperature=0
+        )
+        need = resp["choices"][0]["message"]["content"]
+        usage = resp["usage"]
+    return need, usage
+
+
 async def label_reviews(
     df: pd.DataFrame, needs: List[str], model: str = "gpt-3.5-turbo"
 ) -> pd.DataFrame:
     results = []
     for _, row in df.iterrows():
-        h = _hash_review(row)
         if openai is None:
             result = _dummy_label(row["content"], needs)
         else:
@@ -49,13 +71,11 @@ async def label_reviews(
                 {"role": "system", "content": "You are a helpful assistant"},
                 {"role": "user", "content": row["content"]},
             ]
-            resp = await openai.ChatCompletion.acreate(
-                model=model, messages=msg, temperature=0
-            )
+            need, usage = await _call_openai(msg, model)
             result = {
-                "need": resp["choices"][0]["message"]["content"],
+                "need": need,
                 "sentiment": "positive",  # placeholder
-                "usage": resp["usage"],
+                "usage": usage,
             }
         results.append(result)
     new_df = df.copy()
