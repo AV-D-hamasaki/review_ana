@@ -12,9 +12,15 @@ def load_reviews(file: str | Path | IO) -> pd.DataFrame:
     """Load reviews from CSV or Excel file."""
     path = getattr(file, "name", file)
     if isinstance(path, (str, Path)) and str(path).lower().endswith(".csv"):
-        df = pd.read_csv(file)
+        # handle UTF-8 with BOM exported from Windows Excel
+        df = pd.read_csv(file, encoding="utf-8-sig")
     else:
-        df = pd.read_excel(file)
+        try:
+            df = pd.read_excel(file, engine="openpyxl")
+        except ImportError as e:  # pragma: no cover - depends on environment
+            raise ImportError(
+                "Reading Excel files requires openpyxl. Please install openpyxl."
+            ) from e
     missing = [col for col in REQUIRED_COLUMNS if col not in df.columns]
     if missing:
         raise ValueError(f"missing columns: {missing}")
